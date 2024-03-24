@@ -18,9 +18,9 @@ nltk.download('punkt', quiet=True)
 nltk.download('stopwords', quiet=True)
 stop_words = set(stopwords.words('english'))
 
-NUM_TREADS = 4
+NUM_TREADS = 6
 
-MAX_NUM_ITERATIONS = int(1e3)
+MAX_NUM_ITERATIONS = int(1e2)
 
 base_url = 'https://en.wikipedia.org'
 
@@ -34,10 +34,9 @@ output_file = './data/output.csv'
 def thread_task(queue: Queue[str], finished: Event, lock: Lock, visited: set[str], pbar: tqdm) -> None:
     urls:    list[str] = []
     titles:  list[str] = []
-    content: list[str] = []
+    contents: list[str] = []
 
     while not finished.is_set():
-        # TODO: check
         with lock:
             if finished.is_set() or len(visited) >= MAX_NUM_ITERATIONS:
                 finished.set()
@@ -99,24 +98,26 @@ def thread_task(queue: Queue[str], finished: Event, lock: Lock, visited: set[str
         filtered = [ w for w in word_tokens if not w in stop_words ]
         text = ' '.join(filtered)
 
-        content.append(text)
+        contents.append(text)
 
-        with lock:
-            pbar.update(1)
+        # output contents every 10 iterations
+        if len(urls) >= 10:
+            data = pd.DataFrame({'url': urls, 'title': titles, 'content': contents})
 
-        # output every
-        if len(urls) >= 25:
-            data = pd.DataFrame({'url': urls, 'title': titles, 'content': content})
-            data.to_csv(output_file, mode='a', index=False, header=False)
+            with lock:
+                data.to_csv(output_file, mode='a', index=False, header=False)
+                pbar.update(len(urls))
 
             urls.clear()
             titles.clear()
-            content.clear()
+            contents.clear()
 
     # output contents
     if len(urls) > 0:
-        data = pd.DataFrame({'url': urls, 'title': titles, 'content': content})
-        data.to_csv(output_file, mode='a', index=False, header=False)
+        data = pd.DataFrame({'url': urls, 'title': titles, 'content': contents})
+        with lock:
+            data.to_csv(output_file, mode='a', index=False, header=False)
+            pbar.update(len(urls))
 
     return
 
