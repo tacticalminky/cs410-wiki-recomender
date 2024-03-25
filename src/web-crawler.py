@@ -22,10 +22,10 @@ stop_words = set(stopwords.words('english'))
 
 NUM_TREADS = 6
 
-MAX_NUM_DOCS    = int(10e3)
+MAX_NUM_DOCS    = int(25e3)     # int(100e3)
 MAX_BATCH_SIZE  = 25
 
-VOCAB_SIZE = 500
+VOCAB_SIZE = int(1e3)           # int(4e3)
 
 BASE_URL = 'https://en.wikipedia.org'
 
