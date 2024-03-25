@@ -22,23 +22,25 @@ stop_words = set(stopwords.words('english'))
 
 NUM_TREADS = 6
 
-MAX_NUM_ITERATIONS = int(10e3)
-MAX_BATCH_SIZE = 25
+MAX_NUM_DOCS    = int(10e3)
+MAX_BATCH_SIZE  = 25
 
 VOCAB_SIZE = 500
 
-base_url = 'https://en.wikipedia.org'
+BASE_URL = 'https://en.wikipedia.org'
 
-seed_links = (
+SEED_LINKS = (
     'https://en.wikipedia.org/wiki/University_of_Illinois_Urbana-Champaign',
     'https://en.wikipedia.org/wiki/Computer_science'
 )
 
-doc_labels_file = './data/doc_labels.csv'
-inv_idx_file    = './data/inv_idx.csv'
-vocab_file      = './data/vocab.csv'
+DOC_INFO_FILE   = './data/doc_info.csv'
+INV_IDX_FILE    = './data/inv_idx.csv'
+VOCAB_FILE      = './data/vocab.csv'
 
 def thread_task(queue: Queue[str], lock: Lock, visited: set[str], pbar: tqdm, col_counter: Counter) -> None:
+    # TODO: split into multiple functions
+
     stemmer = PorterStemmer()
 
     thread_counter = Counter()
@@ -52,7 +54,7 @@ def thread_task(queue: Queue[str], lock: Lock, visited: set[str], pbar: tqdm, co
     while True:
         # get a new page
         with lock:
-            if len(visited) >= MAX_NUM_ITERATIONS:
+            if len(visited) >= MAX_NUM_DOCS:
                 break
 
             link = queue.get()
@@ -85,7 +87,7 @@ def thread_task(queue: Queue[str], lock: Lock, visited: set[str], pbar: tqdm, co
                 continue
 
             if sub_link.startswith('/wiki/'):
-                sub_link = base_url + sub_link
+                sub_link = BASE_URL + sub_link
                 if sub_link not in visited and sub_link not in found_links:
                     found_links.add(sub_link)
 
@@ -134,12 +136,12 @@ def thread_task(queue: Queue[str], lock: Lock, visited: set[str], pbar: tqdm, co
 
         # save to files every MAX_BATCH_SIZE iterations
         if len(urls) >= MAX_BATCH_SIZE:
-            doc_labels = pd.DataFrame({'docid': docids, 'url': urls, 'title': titles, 'len': doc_lens})
-            inv_idx = pd.DataFrame(thread_ii, columns=['term', 'docid', 'frequency'])
+            doc_info = pd.DataFrame({'docid': docids, 'url': urls, 'title': titles, 'len': doc_lens})
+            inv_idx  = pd.DataFrame(thread_ii, columns=['term', 'docid', 'frequency'])
 
             with lock:
-                doc_labels.to_csv(doc_labels_file, mode='a', index=False, header=False)
-                inv_idx.to_csv(inv_idx_file, mode='a', index=False, header=False)
+                doc_info.to_csv(DOC_INFO_FILE, mode='a', index=False, header=False)
+                inv_idx.to_csv(INV_IDX_FILE, mode='a', index=False, header=False)
 
                 pbar.update(len(urls))
 
@@ -152,12 +154,12 @@ def thread_task(queue: Queue[str], lock: Lock, visited: set[str], pbar: tqdm, co
 
     # output contents
     if len(urls) > 0:
-        doc_labels = pd.DataFrame({'docid': docids, 'url': urls, 'title': titles, 'len': doc_lens})
-        inv_idx = pd.DataFrame(thread_ii, columns=['term', 'docid', 'frequency'])
+        doc_info = pd.DataFrame({'docid': docids, 'url': urls, 'title': titles, 'len': doc_lens})
+        inv_idx  = pd.DataFrame(thread_ii, columns=['term', 'docid', 'frequency'])
 
         with lock:
-            doc_labels.to_csv(doc_labels_file, mode='a', index=False, header=False)
-            inv_idx.to_csv(inv_idx_file, mode='a', index=False, header=False)
+            doc_info.to_csv(DOC_INFO_FILE, mode='a', index=False, header=False)
+            inv_idx.to_csv(INV_IDX_FILE, mode='a', index=False, header=False)
 
             pbar.update(len(urls))
 
@@ -167,12 +169,14 @@ def thread_task(queue: Queue[str], lock: Lock, visited: set[str], pbar: tqdm, co
     return
 
 def main() -> None:
-    for file in (doc_labels_file, inv_idx_file, vocab_file):
+    # TODO: split into multiple functions
+
+    for file in (DOC_INFO_FILE, INV_IDX_FILE, VOCAB_FILE):
         if os.path.exists(file):
             os.remove(file)
 
     queue = Queue()
-    for link in seed_links:
+    for link in SEED_LINKS:
         queue.put(link)
 
     lock    = Lock()
@@ -182,7 +186,7 @@ def main() -> None:
     threads: list[Thread] = []
 
     print('Starting threads to scrap pages:')
-    pbar = tqdm(total=MAX_NUM_ITERATIONS)
+    pbar = tqdm(total=MAX_NUM_DOCS)
     for _ in range(NUM_TREADS):
         thread = Thread(target=thread_task, args=(queue, lock, visited, pbar, col_counter))
         thread.start()
@@ -204,20 +208,22 @@ def main() -> None:
         freqs.append(freq)
 
     vocab = pd.DataFrame({'term': terms, 'frequency': freqs})
-    vocab.to_csv(vocab_file, index=False, header=False)
+    vocab.to_csv(VOCAB_FILE, index=False, header=False)
 
     # load and reduce inverted index
-    inv_idx = pd.read_csv(inv_idx_file, names=['term', 'docid', 'frequency'], index_col=['term', 'docid'])
+    inv_idx = pd.read_csv(INV_IDX_FILE, names=['term', 'docid', 'frequency'], index_col=['term', 'docid'])
     inv_idx = inv_idx.query('term in @terms')
-    inv_idx.to_csv(inv_idx_file, header=False)
+    inv_idx.to_csv(INV_IDX_FILE, header=False)
 
     # load and reduce doc labels
     docids = set(inv_idx.index.get_level_values('docid'))
-    doc_labels = pd.read_csv(doc_labels_file, names=['docid', 'url', 'title', 'len'], index_col=['docid'])
-    doc_labels = doc_labels.query('docid in @docids')
-    doc_labels.to_csv(doc_labels_file, header=False)
+    doc_info = pd.read_csv(DOC_INFO_FILE, names=['docid', 'url', 'title', 'len'], index_col=['docid'])
+    doc_info = doc_info.query('docid in @docids')
+    doc_info.to_csv(DOC_INFO_FILE, header=False)
 
     print('Finished')
+
+    # TODO: PageRank
 
     return
 
