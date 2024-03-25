@@ -49,7 +49,7 @@ def rank_query(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFram
 
     col_len  = doc_info['len'].sum()
 
-    doc_rel = np.zeros(len(doc_info))
+    doc_rel = np.zeros(max(doc_info.index))
 
     for word in query.split():
         word = stemmer.stem(word.lower())
