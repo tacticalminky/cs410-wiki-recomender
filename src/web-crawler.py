@@ -1,8 +1,9 @@
-import nltk
+from helper import MAX_NUM_DOCS, VOCAB_SIZE, DOC_INFO_FILE, INV_IDX_FILE, VOCAB_FILE
+from helper import load_inv_idx, parse_text
+
 import numpy as np
 import pandas as pd
 import requests
-import re
 import os
 
 from collections import Counter
@@ -12,20 +13,8 @@ from queue import Queue
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk.stem import PorterStemmer
-
-nltk.download('punkt', quiet=True)
-nltk.download('stopwords', quiet=True)
-stop_words = set(stopwords.words('english'))
-
 NUM_TREADS = 6
-
-MAX_NUM_DOCS    = int(25e3)     # int(100e3)
-MAX_BATCH_SIZE  = 25
-
-VOCAB_SIZE = int(1e3)           # int(4e3)
+MAX_BATCH_SIZE = 25
 
 BASE_URL = 'https://en.wikipedia.org'
 
@@ -34,14 +23,8 @@ SEED_LINKS = (
     'https://en.wikipedia.org/wiki/Computer_science'
 )
 
-DOC_INFO_FILE   = './data/doc_info.csv'
-INV_IDX_FILE    = './data/inv_idx.csv'
-VOCAB_FILE      = './data/vocab.csv'
-
 def thread_task(queue: Queue[str], lock: Lock, visited: set[str], pbar: tqdm, col_counter: Counter) -> None:
     # TODO: split into multiple functions
-
-    stemmer = PorterStemmer()
 
     thread_counter = Counter()
     thread_ii = None
@@ -65,8 +48,10 @@ def thread_task(queue: Queue[str], lock: Lock, visited: set[str], pbar: tqdm, co
             visited.add(link)
 
         # get page and title
-        html = requests.get(link).text
-        page = BeautifulSoup(html, 'html.parser')
+        req = requests.get(link)
+        # TODO: check req status
+
+        page = BeautifulSoup(req.text, 'html.parser')
 
         title = page.find(id='firstHeading').text
 
@@ -94,28 +79,17 @@ def thread_task(queue: Queue[str], lock: Lock, visited: set[str], pbar: tqdm, co
         for sub_link in found_links:
             queue.put(sub_link)
 
-        # parse text
+        # build and parse text
         text = ''
         for par in body.find_all('p'):
             text += ' ' + par.text
 
-        # remove new line chars, non-alphanumeric chars, and nums
-        text = re.sub(r'\n|\r', ' ', text)
-        text = re.sub(r"'[\w]*|[^\w\s]+", ' ', text)
-        text = re.sub(r'\d+[\w]*', ' ', text)
+        filtered = parse_text(text)
 
-        # remove extra whitespace and strip
-        text = re.sub(r'\s+', ' ', text)
-        text = text.strip()
-
-        text = text.lower()
-
-        # tokenize and remove stopwords
+        # count terms
         doc_counter = Counter()
-        word_tokens = word_tokenize(text)
-        filtered = [ stemmer.stem(w) for w in word_tokens if not w in stop_words ]
-        for word in filtered:
-            doc_counter[word] += 1
+        for term in filtered:
+            doc_counter[term] += 1
 
         thread_counter += doc_counter
 
@@ -125,7 +99,7 @@ def thread_task(queue: Queue[str], lock: Lock, visited: set[str], pbar: tqdm, co
         titles.append(title)
         doc_lens.append(len(filtered))
 
-        # append ii
+        # append inv idx
         doc_ii = np.array([(str(term), docid, cnt) for term, cnt in doc_counter.items()])
         doc_ii = np.reshape(doc_ii, (len(doc_ii), 3))
 
@@ -134,7 +108,7 @@ def thread_task(queue: Queue[str], lock: Lock, visited: set[str], pbar: tqdm, co
         else:
             thread_ii = np.vstack((thread_ii, doc_ii))
 
-        # save to files every MAX_BATCH_SIZE iterations
+        # save docs to files every MAX_BATCH_SIZE iterations
         if len(urls) >= MAX_BATCH_SIZE:
             doc_info = pd.DataFrame({'docid': docids, 'url': urls, 'title': titles, 'len': doc_lens})
             inv_idx  = pd.DataFrame(thread_ii, columns=['term', 'docid', 'frequency'])
@@ -152,7 +126,7 @@ def thread_task(queue: Queue[str], lock: Lock, visited: set[str], pbar: tqdm, co
             titles.clear()
             doc_lens.clear()
 
-    # output contents
+    # save docs that have yet to be
     if len(urls) > 0:
         doc_info = pd.DataFrame({'docid': docids, 'url': urls, 'title': titles, 'len': doc_lens})
         inv_idx  = pd.DataFrame(thread_ii, columns=['term', 'docid', 'frequency'])
@@ -163,6 +137,7 @@ def thread_task(queue: Queue[str], lock: Lock, visited: set[str], pbar: tqdm, co
 
             pbar.update(len(urls))
 
+    # update collection term counter
     with lock:
         col_counter += thread_counter
 
@@ -171,10 +146,13 @@ def thread_task(queue: Queue[str], lock: Lock, visited: set[str], pbar: tqdm, co
 def main() -> None:
     # TODO: split into multiple functions
 
+    # TODO: extract into seperat function -> crawl_and_create_inv_idx(col_counter)
+    # del old files
     for file in (DOC_INFO_FILE, INV_IDX_FILE, VOCAB_FILE):
         if os.path.exists(file):
             os.remove(file)
 
+    # init vars for counter
     queue = Queue()
     for link in SEED_LINKS:
         queue.put(link)
@@ -183,10 +161,10 @@ def main() -> None:
     visited = set()
     col_counter = Counter()
 
-    threads: list[Thread] = []
-
     print('Starting threads to scrap pages:')
     pbar = tqdm(total=MAX_NUM_DOCS)
+    threads: list[Thread] = []
+
     for _ in range(NUM_TREADS):
         thread = Thread(target=thread_task, args=(queue, lock, visited, pbar, col_counter))
         thread.start()
@@ -195,8 +173,13 @@ def main() -> None:
     for thread in threads:
         thread.join()
 
+    queue.queue.clear()
+    visited.clear()
+
+    threads.clear()
     pbar.close()
 
+    # TODO: extract to seperate function -> create_vocab(col_counter)
     print()
     print('Creating vocab and reducing inverted index')
     # create vocab
@@ -211,15 +194,17 @@ def main() -> None:
     vocab.to_csv(VOCAB_FILE, index=False, header=False)
 
     # load and reduce inverted index
-    inv_idx = pd.read_csv(INV_IDX_FILE, names=['term', 'docid', 'frequency'], index_col=['term', 'docid'])
+    inv_idx = load_inv_idx()
     inv_idx = inv_idx.query('term in @terms')
+    # TODO: sort
     inv_idx.to_csv(INV_IDX_FILE, header=False)
 
     # load and reduce doc labels
-    docids = set(inv_idx.index.get_level_values('docid'))
-    doc_info = pd.read_csv(DOC_INFO_FILE, names=['docid', 'url', 'title', 'len'], index_col=['docid'])
-    doc_info = doc_info.query('docid in @docids')
-    doc_info.to_csv(DOC_INFO_FILE, header=False)
+    # docids = set(inv_idx.index.get_level_values('docid'))
+    # doc_info = load_doc_info()
+    # doc_info = doc_info.query('docid in @docids') # remove
+    # TODO: sort
+    # doc_info.to_csv(DOC_INFO_FILE, header=False)
 
     print('Finished')
 

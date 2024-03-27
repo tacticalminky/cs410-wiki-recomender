@@ -1,32 +1,19 @@
+from helper import load_data, parse_text
+
 import numpy as np
 import pandas as pd
 
 from tqdm import tqdm
 
-from nltk.stem import PorterStemmer
-
 TOP_NUM_TO_PRINT = 10
 
-DOC_INFO_FILE   = './data/doc_info.csv'
-INV_IDX_FILE    = './data/inv_idx.csv'
-VOCAB_FILE      = './data/vocab.csv'
-
-def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    doc_info = pd.read_csv(DOC_INFO_FILE,
-                           names=['docid', 'url', 'title', 'len'],
-                           index_col='docid')
-
-    inv_idx  = pd.read_csv(INV_IDX_FILE,
-                           names=['term', 'docid', 'frequency'],
-                           index_col=['term', 'docid'])
-
-    vocab    = pd.read_csv(VOCAB_FILE,
-                           names=['term', 'frequency'],
-                           index_col='term')
-
-    return (doc_info, inv_idx, vocab)
-
 def print_rankings(doc_info: pd.DataFrame, rankings: np.ndarray) -> None:
+    """Print the doc info of the top ranked docs
+
+    :param doc_info: the DataFrame of the documents returned in load data
+    :param rankings: the ranking of docids sorted in decreadsing relevance
+    """
+
     txt = '\t\t{}) {}\n\t\t\t({})'
 
     print('\tThe top %d results are:' % TOP_NUM_TO_PRINT)
@@ -40,10 +27,6 @@ def print_rankings(doc_info: pd.DataFrame, rankings: np.ndarray) -> None:
 def rank_query(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFrame, query: str) -> None:
     print('Ranking query: "%s" ...' % query)
 
-    # TODO: cleanup query (same as doc contents)
-
-    stemmer = PorterStemmer()
-
     lam = 0.15
     jm_smoothing = (1 - lam) / lam
 
@@ -51,18 +34,19 @@ def rank_query(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFram
 
     doc_rel = np.zeros(max(doc_info.index))
 
-    for word in query.split():
-        word = stemmer.stem(word.lower())
-        if word not in vocab.index:
+    filtered = parse_text(query)
+    for term in filtered:
+        print(term)
+        if term not in vocab.index:
             continue
 
-        col_prob = vocab.loc[word].iloc[0] / col_len
+        col_prob = vocab.loc[term].iloc[0] / col_len
 
-        word_data = inv_idx.loc[word]
-        doc_ids = set(word_data.index)      # docs containing word
+        term_data = inv_idx.loc[term]
+        doc_ids = set(term_data.index)      # docs containing term
         for id in tqdm(doc_ids):
             doc_len = doc_info.loc[id]['len']
-            doc_cnt = word_data.loc[id].iloc[0]
+            doc_cnt = term_data.loc[id].iloc[0]
 
             doc_prob = doc_cnt / doc_len
 
@@ -79,7 +63,7 @@ def rank_query(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFram
 def main() -> None:
     doc_info, inv_idx, vocab = load_data()
 
-    for query in ('Illinois teacher of computer science', 'Interquartile range of dogs'):
+    for query in ('Illinois professor of computer science', 'Inter-quartile range of people and missles'):
         rank_query(doc_info, inv_idx, vocab, query)
 
     return
