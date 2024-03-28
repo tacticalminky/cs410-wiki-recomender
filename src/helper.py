@@ -11,11 +11,11 @@ nltk.download('punkt', quiet=True)
 nltk.download('stopwords', quiet=True)
 stop_words = set(stopwords.words('english'))
 
-stemmer = PorterStemmer()
+_porter = PorterStemmer()
 
 # Define global constants
-MAX_NUM_DOCS = 25000    # -> 100k
-VOCAB_SIZE   = 1000     # -> 8k
+MAX_NUM_DOCS = 1000     # -> 100k
+VOCAB_SIZE   = 200     # -> 8k
 
 DOC_INFO_FILE   = './data/doc_info.csv'
 INV_IDX_FILE    = './data/inv_idx.csv'
@@ -63,7 +63,10 @@ def load_vocab() -> pd.DataFrame:
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Loads the stored data files
 
-    :returns: (doc info, inv idx, vocab)
+    :returns:
+        doc info: (docid -> url, title, len)
+        inv idx: (term -> docid -> frequency)
+        vocab: (term -> frequency)
     """
 
     doc_info = load_doc_info()
@@ -74,7 +77,6 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
                            index_col='term')
 
     return (doc_info, inv_idx, vocab)
-
 
 def parse_text(text: str) -> list[str]:
     """Parse text into a list of terms
@@ -96,6 +98,6 @@ def parse_text(text: str) -> list[str]:
 
     # tokenize and remove stopwords
     word_tokens = word_tokenize(text)
-    filtered = [ stemmer.stem(w) for w in word_tokens if not w in stop_words ]
+    filtered = [ _porter.stem(w) for w in word_tokens if not w in stop_words ]
 
     return filtered

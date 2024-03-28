@@ -12,6 +12,7 @@ tqdm = "*"
 requests = "*"
 
 [dev-packages]
+yappi = "*"
 
 [requires]
 python_version = "3.10"
