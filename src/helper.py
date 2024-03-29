@@ -76,11 +76,11 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
 
     doc_info = load_doc_info()
+    print()
     inv_idx  = load_inv_idx()
-
-    vocab    = pd.read_csv(VOCAB_FILE,
-                           names=['term', 'frequency'],
-                           index_col='term')
+    print()
+    vocab    = load_vocab()
+    print()
 
     return (doc_info, inv_idx, vocab)
 
