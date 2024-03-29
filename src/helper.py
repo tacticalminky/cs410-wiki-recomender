@@ -14,8 +14,8 @@ stop_words = set(stopwords.words('english'))
 _porter = PorterStemmer()
 
 # Define global constants
-MAX_NUM_DOCS = 25000
-VOCAB_SIZE   = 2000
+MAX_NUM_DOCS = 100000
+VOCAB_SIZE   = 8000
 
 DOC_INFO_FILE   = './data/doc_info.csv'
 INV_IDX_FILE    = './data/inv_idx.csv'
