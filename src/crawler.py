@@ -80,7 +80,7 @@ def _thread_task(queue: Queue[str], visited: set[str], queue_lock: Lock, doc_dat
 
         # get page and title
         req = request_session.get(link)
-        # TODO: check req status
+        # TODO: check req status (fail, unauth, redirect, etc.)
         # if req.status_code != 200:
 
         page = BeautifulSoup(req.text, 'lxml', parse_only=strainer)
@@ -91,27 +91,30 @@ def _thread_task(queue: Queue[str], visited: set[str], queue_lock: Lock, doc_dat
 
         # find and queue new links
         if not queue.full():
-            found_links = set()
+            out_links = set()
             for sub_link in body.find_all('a'):
                 if not sub_link.has_attr('href'): continue
 
-                sub_link = sub_link['href']
+                sub_link = str(sub_link['href'])
 
-                if (sub_link.startswith('/wiki/File:')
+                sub_link = sub_link.split('#', 1)[0]
+                if (not sub_link.startswith('/wiki/')
+                    or sub_link.startswith('/wiki/File:')
                     or sub_link.startswith('/wiki/Help:')
                     or sub_link.startswith('/wiki/Special:')
                     or sub_link.startswith('/wiki/Template:')
                     or sub_link.startswith('/wiki/Template_talk:')):
                     continue
 
-                if sub_link.startswith('/wiki/'):
-                    sub_link = BASE_URL + sub_link
-                    if (sub_link not in visited and sub_link not in found_links):
-                        found_links.add(sub_link)
-                        try:
-                            queue.put_nowait(sub_link)
-                        except:
-                            break
+                sub_link = BASE_URL + sub_link
+                if (sub_link not in visited and sub_link not in out_links):
+                    out_links.add(sub_link)
+
+            for sub_link in out_links:
+                try:
+                    queue.put_nowait(sub_link)
+                except:
+                    break
 
         # build, parse, and count text
         text = ' '.join([ par.text for par in body.find_all('p') ])
