@@ -4,18 +4,18 @@ import re
 
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
-from nltk.stem import PorterStemmer
+from nltk.stem.snowball import EnglishStemmer
 
 # import nltk libs and stopwords
 nltk.download('punkt', quiet=True)
 nltk.download('stopwords', quiet=True)
 stop_words = set(stopwords.words('english'))
 
-_porter = PorterStemmer()
+_stemmer = EnglishStemmer()
 
 # Define global constants
-MAX_NUM_DOCS = 100000
-VOCAB_SIZE   = 8000
+MAX_NUM_DOCS = 1000
+VOCAB_SIZE   = 200
 
 DOC_INFO_FILE   = './data/doc_info.csv'
 INV_IDX_FILE    = './data/inv_idx.csv'
@@ -104,6 +104,6 @@ def parse_text(text: str) -> list[str]:
 
     # tokenize and remove stopwords
     word_tokens = word_tokenize(text)
-    filtered = [ _porter.stem(w) for w in word_tokens if not w in stop_words ]
+    filtered = [ _stemmer.stem(w) for w in word_tokens if w not in stop_words ]
 
     return filtered

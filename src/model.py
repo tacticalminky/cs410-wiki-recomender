@@ -63,7 +63,7 @@ def rank_query(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFram
 def main() -> None:
     doc_info, inv_idx, vocab = load_data()
 
-    for query in ('Illinois professor of computer science', 'Inter-quartile range of people and missles'):
+    for query in ('Computer Science', 'Illinois parallel programming'):
         rank_query(doc_info, inv_idx, vocab, query)
 
     return

@@ -5,19 +5,21 @@ from sys import flags
 if flags.dev_mode:
     import yappi
 
+    LOG_FILE = 'yappi.out'
+
 import numpy as np
 import pandas as pd
 import requests
 import os
 
 from collections import Counter
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, SoupStrainer
 from queue import Queue
 from threading import Thread, Lock
 from tqdm import tqdm
 
 NUM_TREADS = 6
-BATCH_SIZE = 25
+BATCH_SIZE = 10
 
 MAX_QUEUE_SIZE = MAX_NUM_DOCS
 
@@ -31,8 +33,6 @@ SEED_LINKS = (
 def _save_data(docids: list[int], urls: list[str], titles: list[str], doc_lens: list[int],
                thread_ii: np.ndarray, pbar: tqdm, doc_data_lock: Lock, idx_data_lock: Lock) -> None:
     """Save the data to disk"""
-
-    # TODO: implement threshold locking [20, 30]
 
     num_docs = len(docids)
 
@@ -51,11 +51,14 @@ def _save_data(docids: list[int], urls: list[str], titles: list[str], doc_lens: 
 
         pbar.update(num_docs)
 
-
     return
 
 def _thread_task(queue: Queue[str], visited: set[str], queue_lock: Lock, doc_data_lock: Lock, idx_data_lock: Lock, pbar: tqdm) -> None:
     """The task of each thread"""
+
+    request_session = requests.Session()
+    strainer = SoupStrainer(attrs={'id': ['firstHeading', 'bodyContent']})
+
     thread_ii = None
 
     docids: list[int]   = []
@@ -77,10 +80,11 @@ def _thread_task(queue: Queue[str], visited: set[str], queue_lock: Lock, doc_dat
             visited.add(link)
 
         # get page and title
-        req = requests.get(link)
+        req = request_session.get(link)
         # TODO: check req status
+        # if req.status_code != 200:
 
-        page = BeautifulSoup(req.text, 'html.parser')
+        page = BeautifulSoup(req.text, 'lxml', parse_only=strainer)
 
         title = page.find(id='firstHeading').text
 
@@ -143,7 +147,7 @@ def _thread_task(queue: Queue[str], visited: set[str], queue_lock: Lock, doc_dat
             thread_ii = None
 
     # save docs that have yet to be
-    if len(urls) > 0:
+    if not thread_ii is None:
         _save_data(docids, urls, titles, doc_lens, thread_ii, pbar, doc_data_lock, idx_data_lock)
         thread_ii = None
 
@@ -169,7 +173,10 @@ def crawl() -> None:
     idx_data_lock = Lock()
 
     if flags.dev_mode:
-        print('Running in dev mode')
+        print('Running in DEV mode...\n')
+        if os.path.exists(LOG_FILE):
+            os.remove(LOG_FILE)
+
         yappi.start()
 
     print('Starting threads to scrap pages:')
@@ -189,6 +196,11 @@ def crawl() -> None:
     if flags.dev_mode:
         yappi.stop()
 
-        yappi.get_func_stats().save(path='yappi.log', type='pstat')
+        def filter(stats: yappi.YFuncStat) -> bool:
+            return True
+
+        print('\nSaving file to "%s"\n' % LOG_FILE)
+
+        yappi.get_func_stats(filter_callback=filter).save(LOG_FILE, type='callgrind')
 
     return

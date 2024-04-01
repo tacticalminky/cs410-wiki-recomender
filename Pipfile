@@ -10,6 +10,8 @@ nltk = "*"
 numpy = "*"
 tqdm = "*"
 requests = "*"
+lxml = "*"
+cchardet = "*"
 
 [dev-packages]
 yappi = "*"
