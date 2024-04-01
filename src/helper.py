@@ -14,8 +14,8 @@ stop_words = set(stopwords.words('english'))
 _stemmer = EnglishStemmer()
 
 # Define global constants
-MAX_NUM_DOCS = 1000
-VOCAB_SIZE   = 200
+NUM_DOCS    = 25000
+VOCAB_SIZE  = 2000
 
 DOC_INFO_FILE   = './data/doc_info.csv'
 INV_IDX_FILE    = './data/inv_idx.csv'
@@ -31,7 +31,8 @@ def load_doc_info() -> pd.DataFrame:
     print('Loading doc info ...')
     doc_info = pd.read_csv(DOC_INFO_FILE,
                            names=['docid', 'url', 'title', 'len'],
-                           index_col='docid')
+                           index_col='docid',
+                           compression='gzip')
     print('Finished loading')
 
     return doc_info
@@ -46,7 +47,8 @@ def load_inv_idx() -> pd.DataFrame:
     print('Loading inverted index ...')
     inv_idx = pd.read_csv(INV_IDX_FILE,
                           names=['term', 'docid', 'frequency'],
-                          index_col=['term', 'docid'])
+                          index_col=['term', 'docid'],
+                          compression='gzip')
     print('Finished loading')
 
     return inv_idx
@@ -61,7 +63,8 @@ def load_vocab() -> pd.DataFrame:
     print('Loading vocab ...')
     vocab = pd.read_csv(VOCAB_FILE,
                         names=['term', 'frequency'],
-                        index_col='term')
+                        index_col='term',
+                        compression='gzip')
     print('Finished loading')
 
     return vocab

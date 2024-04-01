@@ -1,4 +1,4 @@
-from helper import load_data, parse_text
+from helper import NUM_DOCS, load_data, parse_text
 
 import numpy as np
 import pandas as pd
@@ -32,7 +32,7 @@ def rank_query(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFram
 
     col_len  = doc_info['len'].sum()
 
-    doc_rel = np.zeros(max(doc_info.index))
+    doc_rel = np.zeros(NUM_DOCS)
 
     filtered = parse_text(query)
     for term in filtered:

@@ -1,5 +1,4 @@
-from helper import MAX_NUM_DOCS, DOC_INFO_FILE, INV_IDX_FILE
-from helper import parse_text
+from helper import NUM_DOCS, DOC_INFO_FILE, INV_IDX_FILE, parse_text
 
 from sys import flags
 if flags.dev_mode:
@@ -19,9 +18,9 @@ from threading import Thread, Lock
 from tqdm import tqdm
 
 NUM_TREADS = 6
-BATCH_SIZE = 10
+BATCH_SIZE = 13
 
-MAX_QUEUE_SIZE = MAX_NUM_DOCS
+MAX_QUEUE_SIZE = NUM_DOCS
 
 BASE_URL = 'https://en.wikipedia.org'
 
@@ -38,7 +37,7 @@ def _save_data(docids: list[int], urls: list[str], titles: list[str], doc_lens: 
 
     doc_info = pd.DataFrame({'docid': docids, 'url': urls, 'title': titles, 'len': doc_lens})
     with doc_data_lock:
-        doc_info.to_csv(DOC_INFO_FILE, mode='a', index=False, header=False)
+        doc_info.to_csv(DOC_INFO_FILE, mode='a', index=False, header=False, compression='gzip')
 
     docids.clear()
     urls.clear()
@@ -47,7 +46,7 @@ def _save_data(docids: list[int], urls: list[str], titles: list[str], doc_lens: 
 
     inv_idx  = pd.DataFrame(thread_ii, columns=['term', 'docid', 'frequency'])
     with idx_data_lock:
-        inv_idx.to_csv(INV_IDX_FILE, mode='a', index=False, header=False)
+        inv_idx.to_csv(INV_IDX_FILE, mode='a', index=False, header=False, compression='gzip')
 
         pbar.update(num_docs)
 
@@ -69,7 +68,7 @@ def _thread_task(queue: Queue[str], visited: set[str], queue_lock: Lock, doc_dat
     while True:
         # get a new page
         with queue_lock:
-            if len(visited) >= MAX_NUM_DOCS:
+            if len(visited) >= NUM_DOCS:
                 break
 
             link = queue.get()
@@ -114,17 +113,11 @@ def _thread_task(queue: Queue[str], visited: set[str], queue_lock: Lock, doc_dat
                         except:
                             break
 
-        # build and parse text
-        text = ''
-        for par in body.find_all('p'):
-            text += ' ' + par.text
-
+        # build, parse, and count text
+        text = ' '.join([ par.text for par in body.find_all('p') ])
         filtered = parse_text(text)
 
-        # count terms
-        doc_counter = Counter()
-        for term in filtered:
-            doc_counter[term] += 1
+        doc_counter = Counter(filtered)
 
         # add page data
         docids.append(docid)
@@ -180,7 +173,7 @@ def crawl() -> None:
         yappi.start()
 
     print('Starting threads to scrap pages:')
-    pbar = tqdm(total=MAX_NUM_DOCS)
+    pbar = tqdm(total=NUM_DOCS)
 
     threads: list[Thread] = []
     for _ in range(NUM_TREADS):
@@ -196,11 +189,8 @@ def crawl() -> None:
     if flags.dev_mode:
         yappi.stop()
 
-        def filter(stats: yappi.YFuncStat) -> bool:
-            return True
-
         print('\nSaving file to "%s"\n' % LOG_FILE)
 
-        yappi.get_func_stats(filter_callback=filter).save(LOG_FILE, type='callgrind')
+        yappi.get_func_stats().save(LOG_FILE, type='callgrind')
 
     return
