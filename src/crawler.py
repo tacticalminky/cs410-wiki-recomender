@@ -136,8 +136,6 @@ def _thread_task(queue: Queue[str], visited: set[str], queue_lock: Lock, data_lo
             except:
                 break
 
-        # TODO: save out_links for PageRank
-
         # build, parse, and count text
         text = ' '.join([ par.text for par in body.find_all('p') ])
         filtered = parse_text(text)
