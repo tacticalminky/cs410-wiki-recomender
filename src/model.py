@@ -1,4 +1,4 @@
-from helper import NUM_DOCS, load_data, parse_text
+from helper import load_data, parse_text
 
 import numpy as np
 import pandas as pd
@@ -30,9 +30,9 @@ def rank_query(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFram
     lam = 0.15
     jm_smoothing = (1 - lam) / lam
 
-    col_len  = doc_info['len'].sum()
+    col_len = doc_info['len'].sum()
 
-    doc_rel = np.zeros(NUM_DOCS)
+    doc_rel = np.array(doc_info['PageRank'])
 
     filtered = parse_text(query)
     for term in filtered:
@@ -43,7 +43,7 @@ def rank_query(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFram
         col_prob = vocab.loc[term].iloc[0] / col_len
 
         term_data = inv_idx.loc[term]
-        doc_ids = set(term_data.index)      # docs containing term
+        doc_ids = set(term_data.index)  # docs containing term
         for id in tqdm(doc_ids):
             doc_len = doc_info.loc[id]['len']
             doc_cnt = term_data.loc[id].iloc[0]

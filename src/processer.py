@@ -1,6 +1,8 @@
-from helper import DOC_INFO_FILE, INV_IDX_FILE, VOCAB_FILE, VOCAB_SIZE, load_adj_list, load_doc_info, load_inv_idx
+from helper import DOC_INFO_FILE, INV_IDX_FILE, NUM_DOCS, VOCAB_FILE, VOCAB_SIZE, load_adj_list, load_doc_info, load_inv_idx
 
+import numpy as np
 import pandas as pd
+import scipy.sparse as sp
 import os
 
 def create_vocab() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -11,19 +13,18 @@ def create_vocab() -> tuple[pd.DataFrame, pd.DataFrame]:
         vocab
     """
 
-    inv_idx = load_inv_idx()
-    print()
-
     print('Creating vocab ...')
     if os.path.exists(VOCAB_FILE):
         os.remove(VOCAB_FILE)
+
+    inv_idx = load_inv_idx()
 
     vocab = inv_idx.groupby('term').sum()
     vocab = vocab.sort_values(by='frequency', ascending=False).head(VOCAB_SIZE)
 
     vocab.to_parquet(VOCAB_FILE, engine='pyarrow')
 
-    print('Finished\n')
+    print('Finished creating vocab\n')
 
     return inv_idx, vocab
 
@@ -38,14 +39,14 @@ def reduce_and_sort(inv_idx: pd.DataFrame, vocab: pd.DataFrame) -> None:
     inv_idx = inv_idx.query('term in @terms').sort_index()
     inv_idx.to_parquet(INV_IDX_FILE, engine='pyarrow')
 
-    print('Finished inv idx\n')
+    print('Finished reducing and sorting inv idx\n')
 
     # load, reduce, and sort doc labels
     doc_info = load_doc_info()
     doc_info = doc_info.sort_index()
     doc_info.to_parquet(DOC_INFO_FILE, engine='pyarrow')
 
-    print('Finished doc info\n')
+    print('Finished sorting doc info\n')
 
     return
 
@@ -57,21 +58,42 @@ def calc_PageRanks() -> None:
     doc_info = load_doc_info()
     adj_list = load_adj_list()
 
-    print(adj_list.head())
-
-    #adj_list = adj_list.sort_index()
-
     subs = { row['url']: docid for docid, row in doc_info.iterrows() }
 
-    # TODO: reduce and replace w/ ids
-    # TODO: create transition matrix (prob)
-
+    # create transition matrix (prob)
+    # https://stackoverflow.com/questions/60894395/quickly-creating-scipy-sparse-matrix-from-adjacency-list
+    row, col, data = [], [], []
     for docid, adj_list in adj_list.iterrows():
-        print(adj_list['out_links'][0])
-        return
+        out_links = list(adj_list['out_links'])
 
-    # TODO: calc matrix eigen vector
+        # reduce and replace uls w/ ids
+        out_links = [ subs[url] for url in out_links if url in subs.keys() ]
 
-    # TODO: add to and save to doc info
+        m = len(out_links)
+        if m == 0:
+            continue
+
+        col.append(out_links)
+        data.append([1/m] * m)
+        row.append([docid] * m)
+
+    data = np.hstack(data)
+    row = np.hstack(row)
+    col = np.hstack(col)
+
+    M = sp.coo_matrix((data, (row, col)), (NUM_DOCS, NUM_DOCS))
+
+    # calc matrix eigen vector -> power iteration as found on wikipedia
+    b_k = np.random.rand(NUM_DOCS)
+    for _ in range(10):
+        b_k1 = M.dot(b_k)
+
+        b_k = b_k1 / np.linalg.norm(b_k1)
+
+    # add to and save to doc info
+    doc_info['PageRank'] = b_k
+    doc_info.to_parquet(DOC_INFO_FILE, engine='pyarrow')
+
+    print('Finished calculating PageRanks\n')
 
     return

@@ -32,55 +32,46 @@ SEED_LINKS = (
 )
 
 def _save_data(docids: list[int], urls: list[str], titles: list[str], doc_lens: list[int], out_links: list[list[str]],
-               thread_ii: np.ndarray, pbar: tqdm, locks: dict[str, Lock], writers: dict[str, pq.ParquetWriter]) -> None:
+               thread_ii: np.ndarray, pbar: tqdm, lock: Lock, writers: dict[str, pq.ParquetWriter]) -> None:
     """Save the data to disk"""
 
-    doc_info = pd.DataFrame({'url': urls, 'title': titles, 'len': doc_lens}, index=docids)
-    doc_info.index.name = 'docid'
-
-    table = pa.Table.from_pandas(doc_info)
-    with locks['doc_info']:
-        # doc_info.to_csv(DOC_INFO_FILE, mode='a', header=False, compression='gzip')
-
-        if writers.get('doc_info', None) is None:
-            writers['doc_info'] = pq.ParquetWriter(DOC_INFO_FILE, table.schema)
-        writers['doc_info'].write_table(table)
-
-
-    urls.clear()
-    titles.clear()
-    doc_lens.clear()
+    doc_info = pd.DataFrame({'docid': docids, 'url': urls, 'title': titles, 'len': doc_lens})
+    doc_info = doc_info.astype({'docid': int, 'url': str, 'title': str, 'len': int}).set_index('docid')
 
     inv_idx = pd.DataFrame(thread_ii, columns=['term', 'docid', 'frequency'])
-    inv_idx = inv_idx.set_index(['term', 'docid'])
+    inv_idx = inv_idx.astype({'term': str, 'docid': int, 'frequency': int}).set_index(['term', 'docid'])
 
+    adj_list = pd.DataFrame({'docid': docids, 'out_links': out_links})
+    adj_list = adj_list.astype({'docid': int}).set_index('docid')
 
-    table = pa.Table.from_pandas(inv_idx)
-    with locks['inv_idx']:
-        # inv_idx.to_csv(INV_IDX_FILE, mode='a', index=False, header=False, compression='gzip')
+    doc_table = pa.Table.from_pandas(doc_info)
+    ii_table  = pa.Table.from_pandas(inv_idx)
+    adj_table = pa.Table.from_pandas(adj_list)
+
+    with lock:
+        if writers.get('doc_info', None) is None:
+            writers['doc_info'] = pq.ParquetWriter(DOC_INFO_FILE, doc_table.schema)
+        writers['doc_info'].write_table(doc_table)
 
         if writers.get('ii', None) is None:
-            writers['ii'] = pq.ParquetWriter(INV_IDX_FILE, table.schema)
-        writers['ii'].write_table(table)
+            writers['ii'] = pq.ParquetWriter(INV_IDX_FILE, ii_table.schema)
+        writers['ii'].write_table(ii_table)
 
-
-    adj_list = pd.DataFrame({'out_links': out_links}, index=docids)
-    adj_list.index.name = 'docid'
-
-    table = pa.Table.from_pandas(adj_list)
-    with locks['adj_list']:
         if writers.get('adj_list', None) is None:
-            writers['adj_list'] = pq.ParquetWriter(ADJ_LIST_FILE, table.schema)
-        writers['adj_list'].write_table(table)
+            writers['adj_list'] = pq.ParquetWriter(ADJ_LIST_FILE, adj_table.schema)
+        writers['adj_list'].write_table(adj_table)
 
         pbar.update(len(docids))
 
     docids.clear()
+    urls.clear()
+    titles.clear()
+    doc_lens.clear()
     out_links.clear()
 
     return
 
-def _thread_task(queue: Queue[str], visited: set[str], queue_lock: Lock, data_locks: dict[str, Lock], writers: dict[str, pq.ParquetWriter], pbar: tqdm) -> None:
+def _thread_task(queue: Queue[str], visited: set[str], queue_lock: Lock, data_lock: Lock, writers: dict[str, pq.ParquetWriter], pbar: tqdm) -> None:
     """The task of each thread"""
 
     request_session = requests.Session()
@@ -171,12 +162,12 @@ def _thread_task(queue: Queue[str], visited: set[str], queue_lock: Lock, data_lo
 
         # save docs to files every BATCH_SIZE iterations
         if len(urls) >= BATCH_SIZE:
-            _save_data(docids, urls, titles, doc_lens, list_out_links, thread_ii, pbar, data_locks, writers)
+            _save_data(docids, urls, titles, doc_lens, list_out_links, thread_ii, pbar, data_lock, writers)
             thread_ii = None
 
     # save docs that have yet to be
     if not thread_ii is None:
-        _save_data(docids, urls, titles, doc_lens, list_out_links, thread_ii, pbar, data_locks, writers)
+        _save_data(docids, urls, titles, doc_lens, list_out_links, thread_ii, pbar, data_lock, writers)
         thread_ii = None
 
     return
@@ -197,10 +188,7 @@ def crawl() -> None:
     visited = set()
 
     queue_lock = Lock()
-
-    data_locks: dict[str, Lock] = {}
-    for s in ('doc_info', 'inv_idx', 'adj_list'):
-        data_locks[s] = Lock()
+    data_lock = Lock()
 
     writers: dict[str, pq.ParquetWriter] = {}
 
@@ -216,7 +204,7 @@ def crawl() -> None:
 
     threads: list[Thread] = []
     for _ in range(NUM_TREADS):
-        thread = Thread(target=_thread_task, args=(queue, visited, queue_lock, data_locks, writers, pbar))
+        thread = Thread(target=_thread_task, args=(queue, visited, queue_lock, data_lock, writers, pbar))
         thread.start()
         threads.append(thread)
 
