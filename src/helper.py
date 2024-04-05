@@ -1,6 +1,9 @@
 import nltk
 import pandas as pd
 import re
+import subprocess as sp
+
+from tqdm import tqdm
 
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
@@ -14,12 +17,37 @@ stop_words = set(stopwords.words('english'))
 _stemmer = EnglishStemmer()
 
 # Define global constants
-NUM_DOCS    = 25000
-VOCAB_SIZE  = 2000
+NUM_DOCS    = 100
+VOCAB_SIZE  = 200
 
-DOC_INFO_FILE   = './data/doc_info.csv'
-INV_IDX_FILE    = './data/inv_idx.csv'
-VOCAB_FILE      = './data/vocab.csv'
+ADJ_LIST_FILE   = './data/adj_list.parquet'
+DOC_INFO_FILE   = './data/doc_info.parquet'
+INV_IDX_FILE    = './data/inv_idx.parquet'
+VOCAB_FILE      = './data/vocab.parquet'
+
+def load_adj_list() -> pd.DataFrame:
+    """Loads the stored document info
+
+    :returns: document info as a DataFrame
+        (docid -> out_links)
+    """
+
+    print('Loading adjacency list ...')
+    adj_list = pd.read_parquet(ADJ_LIST_FILE, engine='pyarrow')
+
+    # with tqdm(total=NUM_DOCS) as pbar:
+    #     def update(x) -> bool:
+    #         pbar.update(1)
+    #         return False
+    #
+    #     adj_list = pd.read_csv(ADJ_LIST_FILE,
+    #                            names=['docid', 'adj_list'],
+    #                            index_col='docid',
+    #                            compression='gzip',
+    #                            skiprows=update)
+    print('Finished\n')
+
+    return adj_list
 
 def load_doc_info() -> pd.DataFrame:
     """Loads the stored document info
@@ -29,11 +57,19 @@ def load_doc_info() -> pd.DataFrame:
     """
 
     print('Loading doc info ...')
-    doc_info = pd.read_csv(DOC_INFO_FILE,
-                           names=['docid', 'url', 'title', 'len'],
-                           index_col='docid',
-                           compression='gzip')
-    print('Finished loading')
+    doc_info = pd.read_parquet(DOC_INFO_FILE, engine='pyarrow')
+
+    # with tqdm(total=NUM_DOCS) as pbar:
+    #     def update(x) -> bool:
+    #         pbar.update(1)
+    #         return False
+    #
+    #     doc_info = pd.read_csv(DOC_INFO_FILE,
+    #                            names=['docid', 'url', 'title', 'len'],
+    #                            index_col='docid',
+    #                            compression='gzip',
+    #                            skiprows=update)
+    print('Finished\n')
 
     return doc_info
 
@@ -44,12 +80,24 @@ def load_inv_idx() -> pd.DataFrame:
         (term -> docid -> frequency)
     """
 
+    # TODO: add progress bar
+
+    # num_lines = int(sp.getoutput(f'zgrep -c ^ {INV_IDX_FILE}'))
+
     print('Loading inverted index ...')
-    inv_idx = pd.read_csv(INV_IDX_FILE,
-                          names=['term', 'docid', 'frequency'],
-                          index_col=['term', 'docid'],
-                          compression='gzip')
-    print('Finished loading')
+    inv_idx = pd.read_parquet(INV_IDX_FILE, engine='pyarrow')
+
+    # with tqdm(total=num_lines) as pbar:
+    #     def update(x) -> bool:
+    #         pbar.update(1)
+    #         return False
+    #
+    #     inv_idx = pd.read_csv(INV_IDX_FILE,
+    #                           names=['term', 'docid', 'frequency'],
+    #                           index_col=['term', 'docid'],
+    #                           compression='gzip',
+    #                           skiprows=update)
+    print('Finished\n')
 
     return inv_idx
 
@@ -61,11 +109,19 @@ def load_vocab() -> pd.DataFrame:
     """
 
     print('Loading vocab ...')
-    vocab = pd.read_csv(VOCAB_FILE,
-                        names=['term', 'frequency'],
-                        index_col='term',
-                        compression='gzip')
-    print('Finished loading')
+    vocab = pd.read_parquet(VOCAB_FILE, engine='pyarrow')
+
+    # with tqdm(total=VOCAB_SIZE) as pbar:
+    #     def update(x) -> bool:
+    #         pbar.update(1)
+    #         return False
+    #
+    #     vocab = pd.read_csv(VOCAB_FILE,
+    #                         names=['term', 'frequency'],
+    #                         index_col='term',
+    #                         compression='gzip',
+    #                         skiprows=update)
+    print('Finished\n')
 
     return vocab
 
@@ -79,11 +135,8 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
 
     doc_info = load_doc_info()
-    print()
     inv_idx  = load_inv_idx()
-    print()
     vocab    = load_vocab()
-    print()
 
     return (doc_info, inv_idx, vocab)
 

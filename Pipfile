@@ -12,6 +12,7 @@ tqdm = "*"
 requests = "*"
 lxml = "*"
 cchardet = "*"
+pyarrow = "*"
 
 [dev-packages]
 yappi = "*"

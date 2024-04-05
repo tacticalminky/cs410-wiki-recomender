@@ -1,16 +1,16 @@
 from crawler import crawl
-from processer import create_vocab, reduce_and_sort
+from processer import calc_PageRanks, create_vocab, reduce_and_sort
 
 def main() -> None:
     crawl()
-    print()
 
     inv_idx, vocab = create_vocab()
-    print()
 
     reduce_and_sort(inv_idx, vocab)
 
-    # TODO: PageRank
+    del inv_idx, vocab
+
+    calc_PageRanks()
 
     return
 

@@ -3,7 +3,9 @@ __pycache__/
 
 # Data files
 data/*.csv
+data/*.parquet
 !data/*.sample.csv
+!data/*.sample.parquet
 
 # Logs
 yappi.out
