@@ -31,8 +31,9 @@ SEED_LINKS = (
     'https://en.wikipedia.org/wiki/Computer_science'
 )
 
-def _save_data(docids: list[int], urls: list[str], titles: list[str], doc_lens: list[int], out_links: list[list[str]],
-               thread_ii: np.ndarray, pbar: tqdm, lock: Lock, writers: dict[str, pq.ParquetWriter]) -> None:
+def _save_data(docids: list[int], urls: list[str], titles: list[str], doc_lens: list[int],
+               out_links: list[list[str]], thread_ii: np.ndarray, pbar: tqdm,
+               lock: Lock, writers: dict[str, pq.ParquetWriter]) -> None:
     """Save the data to disk"""
 
     doc_info = pd.DataFrame({'docid': docids, 'url': urls, 'title': titles, 'len': doc_lens})
@@ -71,7 +72,8 @@ def _save_data(docids: list[int], urls: list[str], titles: list[str], doc_lens: 
 
     return
 
-def _thread_task(queue: Queue[str], visited: set[str], queue_lock: Lock, data_lock: Lock, writers: dict[str, pq.ParquetWriter], pbar: tqdm) -> None:
+def _thread_task(queue: Queue[str], visited: set[str], omitted: set[str], queue_lock: Lock,
+                 data_lock: Lock, writers: dict[str, pq.ParquetWriter], pbar: tqdm) -> None:
     """The task of each thread"""
 
     request_session = requests.Session()
@@ -93,24 +95,37 @@ def _thread_task(queue: Queue[str], visited: set[str], queue_lock: Lock, data_lo
                 break
 
             link = queue.get()
-            while link in visited:
+            while link in visited or link in omitted:
                 link = queue.get()
 
             docid = len(visited)
             visited.add(link)
 
-        # get page and title
+        # get html
         req = request_session.get(link)
-        # TODO: check req status (fail, unauth, redirect, etc.)
-        # if req.status_code != 200:
+        # check for undesirable status codes (redirect, not found, etc.)
+        while req.status_code != 200:
+            # get new url and try again
+            with queue_lock:
+                print(f'getting new link due to status of {req.status_code}, old link: {link}')
+                omitted.add(link)
+                visited.remove(link)
 
+                while link in visited or link in omitted:
+                    link = queue.get()
+
+                visited.add(link)
+
+            req = request_session.get(link)
+
+        # parse html and get parts
         page = BeautifulSoup(req.text, 'lxml', parse_only=strainer)
 
         title = page.find(id='firstHeading').text
 
         body = page.find(id='bodyContent')
 
-        # find and queue new links
+        # find outbound links
         out_links: set[str] = set()
         for sub_link in body.find_all('a'):
             if not sub_link.has_attr('href'): continue
@@ -127,14 +142,15 @@ def _thread_task(queue: Queue[str], visited: set[str], queue_lock: Lock, data_lo
                 continue
 
             sub_link = BASE_URL + sub_link
-            if (sub_link not in visited and sub_link not in out_links):
-                out_links.add(sub_link)
+            out_links.add(sub_link)
 
+        # queue new links
         for sub_link in out_links:
-            try:
-                queue.put_nowait(sub_link)
-            except:
-                break
+            if sub_link not in visited or sub_link not in omitted:
+                try:
+                    queue.put_nowait(sub_link)
+                except:
+                    break
 
         # build, parse, and count text
         text = ' '.join([ par.text for par in body.find_all('p') ])
@@ -184,6 +200,7 @@ def crawl() -> None:
         queue.put(link)
 
     visited = set()
+    omit    = set()
 
     queue_lock = Lock()
     data_lock = Lock()
@@ -202,7 +219,7 @@ def crawl() -> None:
 
     threads: list[Thread] = []
     for _ in range(NUM_TREADS):
-        thread = Thread(target=_thread_task, args=(queue, visited, queue_lock, data_lock, writers, pbar))
+        thread = Thread(target=_thread_task, args=(queue, visited, omit, queue_lock, data_lock, writers, pbar))
         thread.start()
         threads.append(thread)
 
@@ -215,7 +232,7 @@ def crawl() -> None:
     if flags.dev_mode:
         yappi.stop()
 
-        print('Saving file to "%s"\n' % LOG_FILE)
+        print(f'Saving file to "{LOG_FILE}"\n')
 
         yappi.get_func_stats().save(LOG_FILE, type='callgrind')
 

@@ -83,12 +83,20 @@ def calc_PageRanks() -> None:
 
     M = sp.coo_matrix((data, (row, col)), (NUM_DOCS, NUM_DOCS))
 
-    # calc matrix eigen vector -> power iteration as found on wikipedia
-    b_k = np.random.rand(NUM_DOCS)
-    for _ in range(10):
-        b_k1 = M.dot(b_k)
+    # calc matrix eigen vector -> PageRank as found on wikipedia
+    MAX_NUM_ITER = 100
+    TARGET_ERROR = 1e-6
 
-        b_k = b_k1 / np.linalg.norm(b_k1)
+    b_k = np.random.rand(NUM_DOCS)
+    b_k /= np.linalg.norm(b_k)
+    for _ in range(MAX_NUM_ITER):
+        b_old = b_k
+
+        b_k = M.dot(b_k)
+        b_k /= np.linalg.norm(b_k)
+
+        if np.linalg.norm(b_old - b_k) < TARGET_ERROR:
+            break
 
     # add to and save to doc info
     doc_info['PageRank'] = b_k

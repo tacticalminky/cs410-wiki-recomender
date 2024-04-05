@@ -36,7 +36,6 @@ def rank_query(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFram
 
     filtered = parse_text(query)
     for term in filtered:
-        print(term)
         if term not in vocab.index:
             continue
 
@@ -44,7 +43,7 @@ def rank_query(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFram
 
         term_data = inv_idx.loc[term]
         doc_ids = set(term_data.index)  # docs containing term
-        for id in tqdm(doc_ids):
+        for id in doc_ids:
             doc_len = doc_info.loc[id]['len']
             doc_cnt = term_data.loc[id].iloc[0]
 
@@ -63,7 +62,7 @@ def rank_query(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFram
 def main() -> None:
     doc_info, inv_idx, vocab = load_data()
 
-    for query in ('Computer Science', 'Illinois parallel programming'):
+    for query in ('', 'Computer Science', 'Illinois parallel programming'):
         rank_query(doc_info, inv_idx, vocab, query)
 
     return
