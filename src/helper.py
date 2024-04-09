@@ -17,10 +17,24 @@ _stemmer = EnglishStemmer()
 NUM_DOCS    = 25000
 VOCAB_SIZE  = 2000
 
+ALIAS_FILE      = './data/aliases.parquet'
 ADJ_LIST_FILE   = './data/adj_list.parquet'
 DOC_INFO_FILE   = './data/doc_info.parquet'
 INV_IDX_FILE    = './data/inv_idx.parquet'
 VOCAB_FILE      = './data/vocab.parquet'
+
+def load_aliases() -> pd.DataFrame:
+    """Loads the stored aliases
+
+    :returns: aliases as a DataFrame
+        (from -> to)
+    """
+
+    print('Loading aliases ...')
+    aliases = pd.read_parquet(ALIAS_FILE, engine='pyarrow')
+    print('Finished loading aliases\n')
+
+    return aliases
 
 def load_adj_list() -> pd.DataFrame:
     """Loads the stored document info
@@ -39,7 +53,7 @@ def load_doc_info() -> pd.DataFrame:
     """Loads the stored document info
 
     :returns: document info as a DataFrame
-        (docid -> url, title, len)
+        (docid -> title, url, len)
     """
 
     print('Loading doc info ...')

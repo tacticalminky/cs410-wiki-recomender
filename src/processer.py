@@ -1,4 +1,4 @@
-from helper import DOC_INFO_FILE, INV_IDX_FILE, NUM_DOCS, VOCAB_FILE, VOCAB_SIZE, load_adj_list, load_doc_info, load_inv_idx
+from helper import DOC_INFO_FILE, INV_IDX_FILE, NUM_DOCS, VOCAB_FILE, VOCAB_SIZE, load_adj_list, load_aliases, load_doc_info, load_inv_idx
 
 import numpy as np
 import pandas as pd
@@ -56,9 +56,15 @@ def calc_PageRanks() -> None:
     print('Calculating PageRanks ...')
 
     doc_info = load_doc_info()
+    aliases  = load_aliases()
     adj_list = load_adj_list()
 
-    subs = { row['url']: docid for docid, row in doc_info.iterrows() }
+    subs = { str(row['title']).replace(' ', '_'): docid for docid, row in doc_info.iterrows() }
+
+    aliases = { str(from_title): subs[str(row['to'])] for from_title, row in aliases.iterrows() if str(row['to']) in subs }
+
+    subs |= aliases
+
 
     # create transition matrix (prob)
     # https://stackoverflow.com/questions/60894395/quickly-creating-scipy-sparse-matrix-from-adjacency-list
@@ -67,13 +73,13 @@ def calc_PageRanks() -> None:
         out_links = list(adj_list['out_links'])
 
         # reduce and replace uls w/ ids
-        out_links = [ subs[url] for url in out_links if url in subs.keys() ]
+        out_links = set([ subs[title] for title in out_links if title in subs.keys() ])
 
         m = len(out_links)
         if m == 0:
             continue
 
-        col.append(out_links)
+        col.append(list(out_links))
         data.append([1/m] * m)
         row.append([docid] * m)
 
@@ -86,17 +92,25 @@ def calc_PageRanks() -> None:
     # calc matrix eigen vector -> PageRank as found on wikipedia
     MAX_NUM_ITER = 100
     TARGET_ERROR = 1e-6
+    d = .85
 
-    b_k = np.random.rand(NUM_DOCS)
-    b_k /= np.linalg.norm(b_k)
+    # TODO: update formula -> https://medium.com/polo-club-of-data-science/pagerank-algorithm-explained-with-examples-a5e25e2594c9
+
+    M_hat = d * M
+
+    b_k = np.ones(NUM_DOCS)
+    b_k /= np.linalg.norm(b_k, 3)
     for _ in range(MAX_NUM_ITER):
         b_old = b_k
 
-        b_k = M.dot(b_k)
-        b_k /= np.linalg.norm(b_k)
+        b_k = M_hat.dot(b_k) + ((1 - d) / NUM_DOCS)
+        b_k /= np.linalg.norm(b_k, 3)
 
         if np.linalg.norm(b_old - b_k) < TARGET_ERROR:
             break
+
+    print(f'sum: {b_k.sum()}')
+    print(b_k[:5])
 
     # add to and save to doc info
     doc_info['PageRank'] = b_k

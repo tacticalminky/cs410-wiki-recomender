@@ -3,8 +3,6 @@ from helper import load_data, parse_text
 import numpy as np
 import pandas as pd
 
-from tqdm import tqdm
-
 TOP_NUM_TO_PRINT = 10
 
 def print_rankings(doc_info: pd.DataFrame, rankings: np.ndarray) -> None:
@@ -60,10 +58,19 @@ def rank_query(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFram
     return
 
 def main() -> None:
+    # TODO: take in arg to choose model (set default)
+
     doc_info, inv_idx, vocab = load_data()
 
+    # TODO: cli input for query (in while loop)
+
+    # test queries
     for query in ('', 'Computer Science', 'Illinois parallel programming'):
         rank_query(doc_info, inv_idx, vocab, query)
+
+    # TODO: feedback (automatic and direct) -> pseudo counts
+
+    # save back new models
 
     return
 
