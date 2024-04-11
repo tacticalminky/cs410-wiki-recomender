@@ -35,6 +35,8 @@ SEEDS = (
     'Computer_science'
 )
 
+NUM_RAND_SEEDS = 2
+
 def _save_data(docids: list[int], titles: list[str], urls: list[str], doc_lens: list[int],
                out_links: list[list[str]], aliases: dict[str, str], thread_ii: np.ndarray, pbar: tqdm,
                lock: Lock, writers: dict[str, pq.ParquetWriter]) -> None:
@@ -144,8 +146,8 @@ def _thread_task(queue: Queue[str], visited: set[str], aliased: set[str], omitte
 
                     visited.add(title)
 
-            req = request_session.get(f'{API_URL}/summary/{title}', timeout=1)
-            while not req.ok:
+            res = request_session.get(f'{API_URL}/summary/{title}', timeout=1)
+            while not res.ok:
                 #print(f'getting new title due to status of {req.status_code}, old title: {title}')
                 with queue_lock:
                     omitted.add(title)
@@ -157,15 +159,16 @@ def _thread_task(queue: Queue[str], visited: set[str], aliased: set[str], omitte
 
                     visited.add(title)
 
-                req = request_session.get(f'{API_URL}/summary/{title}', timeout=1)
+                res = request_session.get(f'{API_URL}/summary/{title}', timeout=1)
 
-            summary = req.json()
+            summary = res.json()
 
         # get the html of the page
-        req = request_session.get(f'{API_URL}/html/{title}')
+        res = request_session.get(f'{API_URL}/html/{title}')
         # TODO: error checking (another while loop?)
+        # if not res.ok:
 
-        page = BeautifulSoup(req.text, 'lxml')
+        page = BeautifulSoup(res.text, 'lxml')
 
         # find outbound links
         out_links: set[str] = set()
@@ -241,6 +244,20 @@ def crawl() -> None:
     queue: Queue[str] = Queue(maxsize=MAX_QUEUE_SIZE)
     for title in SEEDS:
         queue.put(title)
+
+    # add random seeds
+    print('Adding some random seed pages...')
+    for i in range(NUM_RAND_SEEDS):
+        res = requests.get(f'{API_URL}/random/summary', timeout=1)
+
+        summary = res.json()
+        title = summary['titles']['canonical']
+
+        print(f'\t{i+1}) {title}')
+
+        queue.put(title)
+
+    print()
 
     visited = set()
     aliased = set()
