@@ -1,5 +1,6 @@
 from crawler import crawl
-from processer import calc_PageRanks, create_vocab, reduce_and_sort
+from link_ranking import calc_link_ranks
+from processer import create_vocab, reduce_and_sort
 
 def main() -> None:
     crawl()
@@ -10,7 +11,7 @@ def main() -> None:
 
     del inv_idx, vocab
 
-    calc_PageRanks()
+    calc_link_ranks()
 
     return
 

@@ -53,7 +53,7 @@ def load_doc_info() -> pd.DataFrame:
     """Loads the stored document info
 
     :returns: document info as a DataFrame
-        (docid -> title, url, len)
+        (docid -> title, url, len, PageRank, auth_score, hub_score)
     """
 
     print('Loading doc info ...')
@@ -92,7 +92,7 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Loads the stored data files
 
     :returns:
-        doc info: (docid -> url, title, len)
+        doc info: (docid -> title, url, len, PageRank, auth_score, hub_score)
         inv idx: (term -> docid -> frequency)
         vocab: (term -> frequency)
     """

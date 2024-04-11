@@ -30,7 +30,8 @@ def rank_query(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFram
 
     col_len = doc_info['len'].sum()
 
-    doc_rel = np.array(doc_info['PageRank'])
+    doc_rel = np.array(doc_info['PageRank'] + 2*doc_info['hub_score'] + doc_info['auth_score'])
+    doc_rel /= 4
 
     filtered = parse_text(query)
     for term in filtered:
@@ -50,6 +51,7 @@ def rank_query(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFram
             doc_rel[id] += np.log(1 + jm_smoothing * (doc_prob / col_prob))
 
     rankings = doc_rel.argsort()[::-1]
+    # print(doc_rel[rankings[:10]])
     print_rankings(doc_info, rankings)
 
     print('Finished ranking query')
