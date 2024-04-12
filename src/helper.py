@@ -23,72 +23,92 @@ DOC_INFO_FILE   = './data/doc_info.parquet'
 INV_IDX_FILE    = './data/inv_idx.parquet'
 VOCAB_FILE      = './data/vocab.parquet'
 
-def load_aliases() -> pd.DataFrame:
+def load_aliases(silence: bool = False) -> pd.DataFrame:
     """Loads the stored aliases
 
     :returns: aliases as a DataFrame
         (from -> to)
     """
 
-    print('Loading aliases ...')
+    if not silence:
+        print('Loading aliases ...')
+
     aliases = pd.read_parquet(ALIAS_FILE, engine='pyarrow')
-    print('Finished loading aliases\n')
+
+    if not silence:
+        print('Finished loading aliases\n')
 
     return aliases
 
-def load_adj_list() -> pd.DataFrame:
+def load_adj_list(silence: bool = False) -> pd.DataFrame:
     """Loads the stored document info
 
     :returns: document info as a DataFrame
         (docid -> out_links)
     """
 
-    print('Loading adjacency list ...')
+    if not silence:
+        print('Loading adjacency list ...')
+
     adj_list = pd.read_parquet(ADJ_LIST_FILE, engine='pyarrow')
-    print('Finished loading\n')
+
+    if not silence:
+        print('Finished loading\n')
 
     return adj_list
 
-def load_doc_info() -> pd.DataFrame:
+def load_doc_info(silence: bool = False) -> pd.DataFrame:
     """Loads the stored document info
 
     :returns: document info as a DataFrame
         (docid -> title, url, len, PageRank, auth_score, hub_score)
     """
 
-    print('Loading doc info ...')
+    if not silence:
+        print('Loading doc info ...')
+
     doc_info = pd.read_parquet(DOC_INFO_FILE, engine='pyarrow')
-    print('Finished loading\n')
+
+    if not silence:
+        print('Finished loading\n')
 
     return doc_info
 
-def load_inv_idx() -> pd.DataFrame:
+def load_inv_idx(silence: bool = False) -> pd.DataFrame:
     """Loads the stored inveted index
 
     :returns: inveted index as a DataFrame
         (term -> docid -> frequency)
     """
 
+    if not silence:
     print('Loading inverted index ...')
-    inv_idx = pd.read_parquet(INV_IDX_FILE, engine='pyarrow')
-    print('Finished loading\n')
+
+        inv_idx = pd.read_parquet(INV_IDX_FILE, engine='pyarrow')
+
+    if not silence:
+        print('Finished loading\n')
 
     return inv_idx
 
-def load_vocab() -> pd.DataFrame:
+def load_vocab(silence: bool = False) -> pd.DataFrame:
     """Loads the stored vocab
 
     :returns: vocab as a DataFrame
         (term -> frequency)
     """
 
-    print('Loading vocab ...')
+    if not silence:
+        print('Loading vocab ...')
+
     vocab = pd.read_parquet(VOCAB_FILE, engine='pyarrow')
-    print('Finished loading\n')
+
+    if not silence:
+        print('Finished loading\n')
 
     return vocab
 
-def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_data(silence: bool = False) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Loads the stored data files
 
     :returns:
@@ -97,9 +117,9 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         vocab: (term -> frequency)
     """
 
-    doc_info = load_doc_info()
-    inv_idx  = load_inv_idx()
-    vocab    = load_vocab()
+    doc_info = load_doc_info(silence)
+    inv_idx  = load_inv_idx(silence)
+    vocab    = load_vocab(silence)
 
     return (doc_info, inv_idx, vocab)
 
