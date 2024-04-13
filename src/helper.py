@@ -82,7 +82,7 @@ def load_inv_idx(silence: bool = False) -> pd.DataFrame:
     """
 
     if not silence:
-    print('Loading inverted index ...')
+        print('Loading inverted index ...')
 
         inv_idx = pd.read_parquet(INV_IDX_FILE, engine='pyarrow')
 
