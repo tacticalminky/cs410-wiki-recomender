@@ -1,9 +1,9 @@
-from crawler import crawl
+from crawler_v2 import start_crawler
 from link_ranking import calc_link_ranks
 from processer import create_vocab, reduce_and_sort
 
 def main() -> None:
-    crawl()
+    start_crawler()
 
     inv_idx, vocab = create_vocab()
 

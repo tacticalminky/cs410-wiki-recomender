@@ -14,7 +14,7 @@ stop_words = set(stopwords.words('english'))
 _stemmer = EnglishStemmer()
 
 # Define global constants
-NUM_DOCS    = 2500
+NUM_DOCS    = 25000
 VOCAB_SIZE  = 2000
 
 ALIAS_FILE      = './data/aliases.parquet'
