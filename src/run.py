@@ -54,11 +54,22 @@ def main() -> None:
     doc_info, inv_idx, vocab = load_data()
 
     # TODO: cli input for query (in while loop)
+    while True:
+        query = input('\nPlease enter in a query (or "exit" to exit):\n').strip()
+        if query == 'exit':
+            break
 
-    # test queries
-    for query in ('', 'Computer Science', 'Illinois parallel programming'):
+        print()
+
         rankings = rank_query(doc_info, inv_idx, vocab, query)
         print_rankings(doc_info, rankings)
+
+    print('Exiting ...')
+
+    # test queries
+    # for query in ('', 'Computer Science', 'Illinois parallel programming'):
+    #     rankings = rank_query(doc_info, inv_idx, vocab, query)
+    #     print_rankings(doc_info, rankings)
 
     # TODO: feedback (automatic and direct) -> pseudo counts
 

@@ -91,7 +91,6 @@ def tf_idf_ranking(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.Data
 
             idf = np.log((NUM_DOCS + 1) / len(doc_ids))
 
-
             doc_rel[id] += (numerator / divisor) * idf
 
     rankings = doc_rel.argsort()[::-1]
