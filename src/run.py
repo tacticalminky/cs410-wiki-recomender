@@ -1,4 +1,5 @@
-from helper import load_data, parse_text
+from helper import load_data
+from models import prob_ranking, tf_idf_ranking
 
 import numpy as np
 import pandas as pd
@@ -22,57 +23,46 @@ def print_rankings(doc_info: pd.DataFrame, rankings: np.ndarray) -> None:
 
     return
 
-def rank_query(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFrame, query: str) -> None:
-    print('Ranking query: "%s" ...' % query)
+def main() -> None:
+    # have user give arg to choose model
+    options = ('0: TF-IDF', '1: Probabilistic')
+    txt = 'Which model would you like to use?'
+    for option in options:
+        txt += f'\n\t{option}'
 
-    lam = 0.15
-    jm_smoothing = (1 - lam) / lam
-
-    col_len = doc_info['len'].sum()
-
-    doc_rel = np.array(doc_info['PageRank'] + 2*doc_info['hub_score'] + doc_info['auth_score'])
-    doc_rel /= 4
-
-    filtered = parse_text(query)
-    for term in filtered:
-        if term not in vocab.index:
-            continue
-
-        col_prob = vocab.loc[term].iloc[0] / col_len
-
-        term_data = inv_idx.loc[term]
-        doc_ids = set(term_data.index)  # docs containing term
-        for id in doc_ids:
-            doc_len = doc_info.loc[id]['len']
-            doc_cnt = term_data.loc[id].iloc[0]
-
-            doc_prob = doc_cnt / doc_len
-
-            doc_rel[id] += np.log(1 + jm_smoothing * (doc_prob / col_prob))
-
-    rankings = doc_rel.argsort()[::-1]
-    # print(doc_rel[rankings[:10]])
-    print_rankings(doc_info, rankings)
-
-    print('Finished ranking query')
+    model = input(f'{txt}\nPlease enter the number: ').strip()
     print()
 
-    return
+    try:
+        model = int(model)
+    except ValueError:
+        print(f'{model} was not an integer.\nPlease select one of the above options.')
+        exit()
 
-def main() -> None:
-    # TODO: take in arg to choose model (set default)
+    match model:
+        case 0:
+            print('You chose a TF-IDF model\n')
+            rank_query = tf_idf_ranking
+        case 1:
+            print('You chose a probabilistic model\n')
+            rank_query = prob_ranking
+        case _:
+            print(f'{model} was not an opiton.\nPlease select one of the above options.')
+            exit()
 
+    # load data
     doc_info, inv_idx, vocab = load_data()
 
     # TODO: cli input for query (in while loop)
 
     # test queries
     for query in ('', 'Computer Science', 'Illinois parallel programming'):
-        rank_query(doc_info, inv_idx, vocab, query)
+        rankings = rank_query(doc_info, inv_idx, vocab, query)
+        print_rankings(doc_info, rankings)
 
     # TODO: feedback (automatic and direct) -> pseudo counts
 
-    # save back new models
+    # TODO: save back new models
 
     return
 
