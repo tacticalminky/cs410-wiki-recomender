@@ -23,10 +23,10 @@ filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 set_start_method('spawn', force=True)
 
 ### Declare constants
-NUM_ORG_THREADS = 2
-NUM_WORKERS     = 12
+NUM_ORG_THREADS = 2     # Num threads in main process to queue pages for workers
+NUM_WORKERS     = 12    # Num processes to do work
 
-BATCH_SIZE  = 13
+BATCH_SIZE  = 250       # How often to save file
 
 API_URL = 'https://en.wikipedia.org/api/rest_v1/page'
 
@@ -155,9 +155,14 @@ def _prepare_tasks(raw_queue: Queue, ready_queue: ThreadQueue,
 
             docid = len(visited)
 
+            slug = raw_queue.get()
+            while slug in visited or slug in aliased or slug in omitted:
+                slug = raw_queue.get()
+
+            visited.add(slug)
+
         # get the summary of a page and filter out aliases
         summary = None
-        slug = None
         while slug is None or summary is None or slug != summary['titles']['canonical']:
             if slug is not None and summary is not None:
                 new_slug = summary['titles']['canonical']
@@ -174,13 +179,16 @@ def _prepare_tasks(raw_queue: Queue, ready_queue: ThreadQueue,
 
                         break
 
-            # get new slug
-            with lock:
-                slug = raw_queue.get()
-                while slug in visited or slug in aliased or slug in omitted:
-                    slug = raw_queue.get()
+                    slug = None
 
-                visited.add(slug)
+            # get new slug
+            if slug is None:
+                with lock:
+                    slug = raw_queue.get()
+                    while slug in visited or slug in aliased or slug in omitted:
+                        slug = raw_queue.get()
+
+                    visited.add(slug)
 
             try:
                 res = request_session.get(f'{API_URL}/summary/{slug}', timeout=(1,3))
@@ -207,7 +215,7 @@ def _prepare_tasks(raw_queue: Queue, ready_queue: ThreadQueue,
         ready_queue.put(task)
 
         # save curr_aliases ever so often
-        if len(curr_aliases) >= 5 * BATCH_SIZE:
+        if len(curr_aliases) >= BATCH_SIZE:
             save_aliases()
 
     # cleanup
