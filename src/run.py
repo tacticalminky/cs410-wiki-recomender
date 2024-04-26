@@ -1,4 +1,5 @@
-from helper import load_data
+import re
+from helper import load_data, parse_text
 from models import prob_ranking, tf_idf_ranking
 
 import numpy as np
@@ -6,7 +7,7 @@ import pandas as pd
 
 TOP_NUM_TO_PRINT = 10
 
-def print_rankings(doc_info: pd.DataFrame, rankings: np.ndarray) -> None:
+def _print_rankings(doc_info: pd.DataFrame, rankings: np.ndarray) -> None:
     """Print the doc info of the top ranked docs
 
     :param doc_info: the DataFrame of the documents returned in load data
@@ -23,8 +24,29 @@ def print_rankings(doc_info: pd.DataFrame, rankings: np.ndarray) -> None:
 
     return
 
+def _update_with_feedback(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFrame, query: str, docids: list[int]) -> None:
+    """Updates the documents with the provided feedback"""
+
+    print('Updating with feedback...')
+
+    filtered = parse_text(query)
+    for term in filtered:
+        if term not in vocab.index:
+            continue
+
+        psuedo_term_cnt = 2
+        for id in docids:
+            inv_idx.loc[term, id] += psuedo_term_cnt
+            doc_info.loc[id, 'len'] += psuedo_term_cnt
+
+        vocab.loc[term] += psuedo_term_cnt * len(docids)
+
+    print('Finished\n')
+
+    return
+
 def main() -> None:
-    # have user give arg to choose model
+    # have user choose model
     options = ('0: TF-IDF', '1: Probabilistic')
     txt = 'Which model would you like to use?'
     for option in options:
@@ -62,7 +84,33 @@ def main() -> None:
         print()
 
         rankings = rank_query(doc_info, inv_idx, vocab, query)
-        print_rankings(doc_info, rankings)
+        _print_rankings(doc_info, rankings)
+
+        rel_docs = input('\nWhich docs were relevant?\nPlease enter the numbers seperated with spaces and/or commas:\n').strip()
+        rel_docs = re.sub(r',|\s+', ' ', rel_docs)
+        rel_docs = rel_docs.split()
+
+        print()
+
+        failed = False
+        docids = list()
+        for num in rel_docs:
+            try:
+                idx = int(num) - 1
+            except ValueError:
+                print(f'{num} was not a number, failed to update ranks')
+                failed = True
+                break
+
+            if idx >= TOP_NUM_TO_PRINT:
+                print(f'{num} is outside of the returned documents, failed to update')
+                failed = True
+                break
+
+            docids.append(rankings[idx])
+
+        if not failed and len(docids) > 0:
+            _update_with_feedback(doc_info, inv_idx, vocab, query, docids)
 
     print('Exiting ...')
 
@@ -70,8 +118,6 @@ def main() -> None:
     # for query in ('', 'Computer Science', 'Illinois parallel programming'):
     #     rankings = rank_query(doc_info, inv_idx, vocab, query)
     #     print_rankings(doc_info, rankings)
-
-    # TODO: feedback (automatic and direct) -> pseudo counts
 
     # TODO: save back new models
 
