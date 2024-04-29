@@ -75,7 +75,7 @@ def main() -> None:
     # load data
     doc_info, inv_idx, vocab = load_data()
 
-    # TODO: cli input for query (in while loop)
+    # cli input for query
     while True:
         query = input('\nPlease enter in a query (or "exit" to exit):\n').strip()
         if query == 'exit':
@@ -118,8 +118,6 @@ def main() -> None:
     # for query in ('', 'Computer Science', 'Illinois parallel programming'):
     #     rankings = rank_query(doc_info, inv_idx, vocab, query)
     #     print_rankings(doc_info, rankings)
-
-    # TODO: save back new models
 
     return
 
