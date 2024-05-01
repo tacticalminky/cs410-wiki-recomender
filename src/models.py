@@ -3,7 +3,7 @@ from helper import NUM_DOCS, parse_text
 import numpy as np
 import pandas as pd
 
-def prob_ranking(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFrame, query: str) -> np.ndarray:
+def prob_ranking(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFrame, query: str, silence: bool = False) -> np.ndarray:
     """Rank the query using a probabilistic model
 
     :param doc_info:    DataFrame of document info
@@ -14,7 +14,8 @@ def prob_ranking(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFr
     :returns:   The document indecies in decreasing order of ranking
     """
 
-    print('Ranking query: "%s" ...' % query)
+    if not silence:
+        print('Ranking query: "%s" ...' % query)
 
     # set smoothing params
     lam = 0.15
@@ -47,11 +48,12 @@ def prob_ranking(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFr
     rankings = doc_rel.argsort()[::-1]
     # print(doc_rel[rankings[:10]])
 
-    print('Finished ranking query\n')
+    if not silence:
+        print('Finished ranking query\n')
 
     return rankings
 
-def tf_idf_ranking(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFrame, query: str) -> np.ndarray:
+def tf_idf_ranking(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFrame, query: str, silence: bool = False) -> np.ndarray:
     """Rank the query using a TF-IDF model
 
     :param doc_info:    DataFrame of document info
@@ -62,7 +64,8 @@ def tf_idf_ranking(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.Data
     :returns:   The document indecies in decreasing order of ranking
     """
 
-    print('Ranking query: "%s" ...' % query)
+    if not silence:
+        print('Ranking query: "%s" ...' % query)
 
     # set smoothing params
     k: int = 10
@@ -96,6 +99,7 @@ def tf_idf_ranking(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.Data
     rankings = doc_rel.argsort()[::-1]
     # print(doc_rel[rankings[:10]])
 
-    print('Finished ranking query\n')
+    if not silence:
+        print('Finished ranking query\n')
 
     return rankings
