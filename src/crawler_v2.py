@@ -26,7 +26,7 @@ set_start_method('spawn', force=True)
 NUM_ORG_THREADS = 2     # Num threads in main process to queue pages for workers
 NUM_WORKERS     = 12    # Num processes to do work
 
-BATCH_SIZE  = 250       # How often to save file
+BATCH_SIZE = 128        # How often to save file
 
 API_URL = 'https://en.wikipedia.org/api/rest_v1/page'
 
@@ -37,8 +37,10 @@ SEEDS = (
 
 NUM_RAND_SEEDS = 2
 
-MAX_RAW_QUEUE_SIZE = NUM_DOCS
-MAX_READY_QUEUE_SIZE = 3 * NUM_WORKERS
+MAX_RAW_QUEUE_SIZE = 2 * NUM_DOCS
+MAX_READY_QUEUE_SIZE = 5 * NUM_WORKERS
+
+CALLBACK_TIMEOUT = 3
 
 
 ### Declare worker class
@@ -165,6 +167,15 @@ def _prepare_tasks(raw_queue: Queue, ready_queue: ThreadQueue,
         summary = None
         while slug is None or summary is None or slug != summary['titles']['canonical']:
             if slug is not None and summary is not None:
+                if summary.get('titles', None) is None or summary['titles'].get('canonical', None) is None:
+                    with lock:
+                        omitted.add(slug)
+                        visited.add(slug)
+
+                    slug = None
+                    continue
+
+
                 new_slug = summary['titles']['canonical']
 
                 curr_aliases[slug] = new_slug
@@ -291,7 +302,7 @@ def start_crawler() -> None:
         pbar.update(1)
 
         try:
-            task = ready_queue.get(timeout=.5)
+            task = ready_queue.get(timeout=CALLBACK_TIMEOUT)
             results.put(worker_pool.apply_async(_worker_task, args=task, callback=task_callback))
         except:
             return
