@@ -23,9 +23,9 @@ def prob_ranking(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.DataFr
     col_len = doc_info['len'].sum()
 
     # init doc relivance
-    doc_rel = np.zeros(NUM_DOCS)
-    # doc_rel = np.array(doc_info['PageRank'] + 2*doc_info['hub_score'] + doc_info['auth_score'])
-    # doc_rel /= 4
+    # doc_rel = np.zeros(NUM_DOCS)
+    doc_rel = np.array(doc_info['PageRank'] + 2*doc_info['hub_score'] + doc_info['auth_score'])
+    doc_rel /= 4
 
     filtered = parse_text(query)
     for term in filtered:
@@ -71,9 +71,9 @@ def tf_idf_ranking(doc_info: pd.DataFrame, inv_idx: pd.DataFrame, vocab: pd.Data
     avg_doc_len = doc_info['len'].mean()
 
     # init doc relivance with link rankings
-    doc_rel = np.zeros(NUM_DOCS)
-    # doc_rel = np.array(doc_info['PageRank'] + 2*doc_info['hub_score'] + doc_info['auth_score'])
-    # doc_rel /= 4
+    # doc_rel = np.zeros(NUM_DOCS)
+    doc_rel = np.array(doc_info['PageRank'] + 2*doc_info['hub_score'] + doc_info['auth_score'])
+    doc_rel /= 4
 
     filtered = parse_text(query)
     for term in filtered:
